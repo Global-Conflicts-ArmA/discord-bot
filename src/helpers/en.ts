@@ -2,7 +2,8 @@ import ILocale from './locale';
 
 const locale: ILocale = {
   address: 'Address',
-  serverName: 'Operations Server',
+  arma3ServerName: 'ArmA 3 Operations Server',
+  armaReforgerServerName: 'ArmA Reforger Operations Server',
   maintenanceMessages: {
     disabled: `I've disabled maintenance mode and I am polling the server once more!`,
     enabled: `I've enabled maintenance mode and will no longer poll the server!`,

@@ -3,25 +3,21 @@ import { DiscordClientProvider, On, Once } from '@discord-nestjs/core';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ActionRowBuilder, ActivityType, EmbedBuilder, Interaction, StringSelectMenuBuilder, TextChannel } from 'discord.js';
+import * as fs from 'fs';
 import { Player, QueryResult } from 'gamedig';
 import * as mongo from 'mongodb';
 import { InjectDb } from 'nest-mongodb';
 import { COLOR_ERROR, COLOR_MAINTENANCE, COLOR_OK } from '../helpers/colors';
 import locale from '../helpers/en';
 import Server from '../helpers/server';
-import Time from '../helpers/time';
 import Settings from '../polling/teamspeak/settings';
 import MayPostTeamspeakViewer from '../polling/teamspeak/teamspeak';
-import * as chokidar from 'chokidar';
-import * as path from 'path';
 
 @Injectable()
 export class BotGateway {
   private readonly logger = new Logger(BotGateway.name);
   private maintenanceMode: boolean;
-  private server = new Server(process.env.IP, parseInt(process.env.PORT));
-  private refreshFails = 0;
-  private maxRefreshFails = parseInt(process.env.MAXIMUM_REFRESH_FAILURES);
+  private reforgerServer = new Server(process.env.IP, parseInt(process.env.REFORGERPORT), 'armareforger')
   constructor(
     private readonly discordProvider: DiscordClientProvider,
     @InjectDb() private readonly db: mongo.Db,
@@ -29,34 +25,9 @@ export class BotGateway {
 
   @Once('ready')
   onReady(): void {
-    const discordProvider = this.discordProvider;
     this.logger.log(
       `Logged in as ${this.discordProvider.getClient().user.tag}!`,
     );
-
-
-    // chokidar.watch('C:\\www\\media\\youtube_vids', {
-    //   ignoreInitial:true,
-    //   awaitWriteFinish: {
-    //     stabilityThreshold: 5000,
-    //     pollInterval: 1000
-    //   },
-    // })
-    //   .on('add', async function (_path) {
-    //     const discordClient = discordProvider.getClient();
-    //     const channel: TextChannel = discordClient.channels.cache.get(
-    //       process.env.ARMA_MEDIA_CHANNEL,
-    //     ) as TextChannel;
-
-    //     const file =
-    //       encodeURI(path.basename(_path));
-
-    //     await channel.send({
-    //       content: `Someone uploaded new footage the FTP!\nhttps://content.globalconflicts.net/youtube_vids/${file}
-    //     `,
-    //     });
-    //   })
-
     this.startPolling();
     this.loopPolling();
     console.info('Bot is running');
@@ -231,8 +202,8 @@ export class BotGateway {
   async startPolling(forceNewMessage = false) {
     const discordClient = this.discordProvider.getClient();
 
-    const armaPingChannel: TextChannel = discordClient.channels.cache.get(
-      process.env.ARMA_PINGS_CHANNEL_ID,
+    const serverViewerChannel: TextChannel = discordClient.channels.cache.get(
+      process.env.SERVER_VIEWER_CHANNEL_ID,
     ) as TextChannel;
 
     await MayPostTeamspeakViewer(discordClient);
@@ -242,27 +213,26 @@ export class BotGateway {
       return;
     }
 
-    const messageId = Settings.get().messageId;
-    //Find reforger server
-    //const queryReforger = await this.queryReforger;
+    const reforgerMessageId = Settings.get().reforgerMessageId
 
-    const query = await this.query;
+    const queryReforger = await this.queryReforger;
 
-    if (messageId && !forceNewMessage) {
-      console.log(`old server status message id found ${messageId}`);
+    let botError = false;
+
+    if (reforgerMessageId && !forceNewMessage) {
+      console.log(`old server status message id found ${reforgerMessageId}`);
       try {
-        const oldMessage = await armaPingChannel.messages.fetch(messageId);
-        const embed = await this.createRichEmbed(query);
+        const oldMessage = await serverViewerChannel.messages.fetch(reforgerMessageId);
+        const embed = await this.createRichEmbed(queryReforger, this.maintenanceMode);
 
         const editing = oldMessage.edit({ embeds: [embed] });
         editing
           .then(() => {
             console.log(`server status message edited`);
-            this.setActivity(query ? 'ok' : 'serverError', query);
           })
           .catch((error) => {
-            this.setActivity('botError');
-            console.error(`Failed to edit current message, id: ${messageId}.`);
+            botError = true;
+            console.error(`Failed to edit current message, id: ${reforgerMessageId}.`);
             console.error(error);
           });
       } catch (error) {
@@ -270,98 +240,34 @@ export class BotGateway {
         console.error(error);
       }
     } else {
-      if (forceNewMessage && messageId) {
+      if (forceNewMessage && reforgerMessageId) {
         console.log(`Deleting old server status message`);
-        const message = await armaPingChannel.messages.fetch(messageId);
+        const message = await serverViewerChannel.messages.fetch(reforgerMessageId);
         await message.delete();
       }
 
       console.log(`Posting new server status message`);
-      const embed = await this.createRichEmbed(query);
-      armaPingChannel
+      const embed = await this.createRichEmbed(queryReforger);
+      serverViewerChannel
         .send({ embeds: [embed] })
         .then((newMessage) => {
-          Settings.set('messageId', newMessage.id);
-          this.setActivity(query ? 'ok' : 'serverError', query);
+          Settings.set('reforgerMessageId', newMessage.id);
         })
         .catch((error) => {
-          this.setActivity('botError');
+          botError = true;
           console.error('Failed to create a new message.');
           console.error(error);
         });
     }
-    const errorMessageId = Settings.get().errorMessageId;
-    if (!query) {
-      if (!errorMessageId) {
-        console.log(`An arma server error occured, pinging admins`);
-        const ping = this.generatePing(process.env.DISCORD_ADMIN_ROLE_ID);
-        const content = `${ping}${locale.serverDownMessages.pingMessage}`;
 
-        armaPingChannel.send(content).then((newMessage) => {
-          Settings.set('errorMessageId', newMessage.id);
-        });
-      }
+    if (botError) {
+      this.setActivity('botError');
     } else {
-      console.log(`Server back online, removing ping message`);
-      this.removeErrorMessage(armaPingChannel);
-    }
-    // Post role ping message if threshold reached
-    if (query) {
-      console.log(`Server online`);
-      const minPlayers = parseInt(process.env.MINIMUM_PLAYER_COUNT_FOR_PING);
-
-      if (query.players.length >= minPlayers) {
-        // Don't duplicate the message
-        console.log(`Pinging players`);
-        if (!Settings.get().pingMessageId) {
-          armaPingChannel
-            .send(
-              this.generatePing(process.env.ARMA_PINGS_ROLE_ID) +
-              ` ${minPlayers} ${locale.pingMessage}`,
-            )
-            .then((newMessage) => {
-              Settings.set('pingMessageId', newMessage.id);
-              Settings.set('lastPingMessageTime', new Date().toISOString());
-            })
-            .catch((error) => {
-              this.setActivity('botError');
-              console.error('Failed to create a new message.');
-              console.error(error);
-            });
-        }
+      if (queryReforger) {
+        this.setActivity('ok', queryReforger);
       } else {
-        console.log(
-          `Player count lowered bellow ${minPlayers}, removing ping message`,
-        );
-        const settings = Settings.get();
-        if (settings.pingMessageId && settings.lastPingMessageTime) {
-          if (
-            Time.getDiffMinutes(
-              new Date(),
-              new Date(settings.lastPingMessageTime),
-            ) >= parseInt(process.env.TIMEOUT_BETWEEN_PLAYER_PINGS_IN_MINUTES)
-          ) {
-            try {
-              const message = await armaPingChannel.messages.fetch(
-                settings.pingMessageId,
-              );
-              await message.delete();
-            } catch (error) { }
-
-            Settings.set('pingMessageId', undefined);
-          }
-        }
+        this.setActivity('serverError', queryReforger)
       }
-    }
-  }
-
-  private async removeErrorMessage(channel: TextChannel) {
-    const errorMessageId = Settings.get().errorMessageId;
-    if (errorMessageId) {
-      const message = await channel.messages.fetch(errorMessageId);
-      await message.delete();
-
-      Settings.set('errorMessageId', undefined);
     }
   }
 
@@ -372,35 +278,44 @@ export class BotGateway {
     }, parseInt(timeToWait) * 1000);
   }
 
-  private get query(): Promise<QueryResult | undefined> {
+  private get queryReforger(): Promise<QueryResult | undefined> {
     return new Promise((resolve) => {
-      this.server
+      this.reforgerServer
         .queryServer()
         .then((query) => {
           if (query) {
-            resolve(query);
+            fs.readFile(process.env.REFORGER_SERVER_ADMIN_STATS_FILE, 'utf-8', function(err, data) {
+              if (err) {
+                console.log(`Failed to load player list.`);
+                throw new Error();
+              }
+              const obj = JSON.parse(data);
+              query.players = Object.values(obj.connected_players).map(p => {
+                if (typeof p !== "string") {
+                  console.log(`Failed to parse player list.`);
+                  throw new Error();
+                }
+                return {
+                  name: p,
+                  raw: {
+                    time: 0,
+                    score: 0
+                  }
+                }
+              })
+              resolve(query);
+            })
           } else {
-            this.refreshFails++;
-            console.warn(
-              `Failed to refresh server info.`,
-              `Remaining retries: ${this.refreshFails}/${this.maxRefreshFails}`,
-            );
-            if (this.refreshFails >= this.maxRefreshFails) {
-              this.refreshFails = 0;
-              try {
-                const discordClient = this.discordProvider.getClient();
-                const armaPingChannel: TextChannel =
-                  discordClient.channels.cache.get(
-                    process.env.ARMA_PINGS_CHANNEL_ID,
-                  ) as TextChannel;
-              } catch (error) { }
-              console.error('Failed to refresh server info, emitting error.');
-              resolve(undefined);
-            }
+            console.log(`Failed to refresh server info.`);
+            resolve(undefined);
           }
         })
-        .catch(() => {
+        .catch((err) => {
+          console.log(process.env.REFORGERPORT)
+          console.log(parseInt(process.env.REFORGERPORT))
+          console.log(err);
           console.log('Server is offline');
+          resolve(undefined);
         });
     });
   }
@@ -408,6 +323,82 @@ export class BotGateway {
   private getDescriptionRepeater(text: string): string {
     // Repeat the dashes for 62.5% of the text length
     return '─'.repeat(text.length * 0.625);
+  }
+
+  private async getReforgerFields(query: QueryResult): Promise<IField[]> {
+    const playerListData = ['```py'];
+    // Check if the embed doesn't go over the maximum allowed Discord value
+    let hasPlayers = true;
+    if (
+      query.players.length &&
+      this.getPlayerListCharacterCount(query.players) < 1024
+    ) {
+      // Sort alphabetically
+      query.players.sort((a, b) =>
+        a.name > b.name ? 1 : b.name > a.name ? -1 : 0,
+      );
+      query.players.forEach((player) => {
+        playerListData.push(this.getPlayerDisplayText(player));
+      });
+    } else if (query.players.length) {
+      playerListData.push(locale.tooManyPlayers);
+    } else {
+      playerListData.push(locale.noPlayers);
+      hasPlayers = false;
+    }
+    if (!hasPlayers) {
+      return [
+        {
+          inline: true,
+          name: locale.statuses.status,
+          value: locale.statuses.online,
+        },
+        {
+          inline: true,
+          name: 'State',
+          value: 'No Mission Loaded',
+        },
+      ];
+    } else {
+      playerListData.push('```');
+      return [
+        {
+          inline: false,
+          name: locale.statuses.status,
+          value: locale.statuses.online,
+        },
+        {
+          inline: true,
+          name: 'Mission Type',
+          value: "Custom",
+        },
+        {
+          inline: true,
+          name: locale.mission,
+          value: query.map,
+        },
+        {
+          inline: true,
+          name: '\u200b',
+          value: '\u200b',
+        },
+        {
+          inline: true,
+          name: locale.playerCount,
+          value: `${query.players.length}/${query.maxplayers}`,
+        },
+        {
+          inline: true,
+          name: '\u200b',
+          value: '\u200b',
+        },
+        {
+          inline: false,
+          name: locale.playerList,
+          value: playerListData.join('\n'),
+        },
+      ];
+    }   
   }
 
   private async getSuccessFields(query: QueryResult): Promise<IField[]> {
@@ -447,7 +438,8 @@ export class BotGateway {
     } else {
       let missionType = 'undefined';
       let typeLength = 2;
-      const gameName: string = query.raw.game;
+      const raw: any = query.raw
+      const gameName: string = raw.game;
       if (gameName.substring(0, 5) == 'COTVT') {
         missionType = 'COTVT';
         typeLength = 5;
@@ -549,7 +541,7 @@ export class BotGateway {
           {
             inline: true,
             name: locale.mission,
-            value: query.raw.game,
+            value: raw.game,
           },
           {
             inline: true,
@@ -623,13 +615,13 @@ export class BotGateway {
         color: COLOR_OK,
         // As the ─ is just a little larger than the actual letters, it isn't equal to the letter count
         description: this.getDescriptionRepeater(query.name),
-        fields: await this.getSuccessFields(query),
+        fields: await this.getReforgerFields(query),
         timestamp: new Date(),
         thumbnail: {
           url: 'https://globalconflicts.net/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fbanner.8d01371c.png&w=1080&q=100',
         },
         //title: query.name,
-        title: locale.serverName,
+        title: locale.armaReforgerServerName,
       });
     } else if (maintenanceMode) {
       return new EmbedBuilder({
@@ -652,85 +644,19 @@ export class BotGateway {
 
   public async setActivity(
     status: 'ok' | 'serverError' | 'botError' | 'maintenance',
-    query?: QueryResult,
+    query?: QueryResult
   ) {
     const _client = await this.discordProvider.getClient();
     if (query && status === 'ok') {
-      if (query.players.length) {
-        let missionType = 'undefined';
-        let typeLength = 2;
-        const gameName: string = query.raw['game'];
-        if (gameName.substring(0, 5) == 'COTVT') {
-          missionType = 'COTVT';
-          typeLength = 5;
-        } else {
-          switch (gameName ? gameName.substring(0, 2) : 'undefined') {
-            case 'CO': {
-              missionType = 'COOP';
-              break;
-            }
-            case 'TV': {
-              missionType = 'TVT';
-              typeLength = 3;
-              break;
-            }
-            case 'LO': {
-              missionType = 'LOL';
-              typeLength = 3;
-              break;
-            }
-            default: {
-              missionType = 'undefined';
-            }
-          }
-        }
-
-        let missionName = 'undefined';
-        let missionSlots = '64';
-        let name = `Unknown mission on ${query.map}`;
-        if (missionType !== 'undefined') {
-          const missionSlotsSearch = gameName.match(/[A-z]+([0-9]+)/);
-          if (missionSlotsSearch && typeLength) {
-            missionSlots = missionSlotsSearch[1];
-            const missionNameSlice = gameName.slice(
-              typeLength + missionSlots.length,
-            );
-            const missionNameSearch = missionNameSlice.match(/\w+.+/);
-            missionName = missionNameSearch
-              ? missionNameSearch[0].replace(/_/g, ' ')
-              : 'undefined';
-          }
-          name = `${missionType} - ${missionName} on ${query.map} (${query.players.length}/${missionSlots})`;
-        } else {
-          name = `${query.raw.game} on ${query.map} (${query.players.length}/${query.maxplayers})`;
-        }
-
-        if (!query.map) {
-          name = `${locale.noMap} (${query.players.length}/${query.maxplayers})`;
-        }
-
-        _client.user.setPresence({
-          status: 'online',
-          activities: [
-            {
-              name,
-              type: ActivityType.Playing
-            },
-          ],
-        });
-      } else {
-        const name = `${locale.noMap}`;
-
-        _client.user.setPresence({
-          status: 'online',
-          activities: [
-            {
-              name,
-              type: ActivityType.Playing
-            },
-          ],
-        });
-      }
+      _client.user.setPresence({
+        status: 'online',
+        activities: [
+          {
+            name: `${query.map} (${query.players.length}/${query.maxplayers})`,
+            type: ActivityType.Playing
+          },
+        ],
+      });
     } else if (status === 'serverError') {
       _client.user.setPresence({
         status: 'dnd',

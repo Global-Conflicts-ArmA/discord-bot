@@ -2,7 +2,6 @@ import { BotModule } from './bot/bot.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UsersController } from './users/users.controller';
-import { ServerController } from './server/server.controller';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MissionsController } from './missions/missions.controller';
@@ -38,7 +37,7 @@ import { GatewayIntentBits } from 'discord.js';
     BotModule,
     MongoModule.forRoot(process.env.MONGO_HOST, 'prod'),
   ],
-  controllers: [UsersController, MissionsController, AppController, ServerController],
+  controllers: [UsersController, MissionsController, AppController],
   providers: [AppService],
 })
 export class AppModule {}

@@ -1,6 +1,7 @@
 export default interface ILocale {
   address: string;
-  serverName: string;
+  arma3ServerName: string;
+  armaReforgerServerName
   maintenanceMessages: {
     disabled: string;
     enabled: string;

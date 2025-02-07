@@ -26,9 +26,10 @@ export default class Settings {
 
 export interface ISettings {
   errorMessageId?: string;
-  messageId?: string;
+  a3MessageId?: string;
   pingMessageId?: string;
   lastPingMessageTime?: string;
   lastTS3MessageTime?: string;
+  reforgerMessageId?: string;
   ts3messageId?: string;
 }
