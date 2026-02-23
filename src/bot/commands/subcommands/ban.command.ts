@@ -4,12 +4,12 @@ import { ChatInputCommandInteraction, ClientEvents, TextChannel, GuildMemberRole
 
 // Authorized roles that can run this command
 const AUTHORIZED_ROLES = [
+  '635885925003690006', // Admin
   '824719678475599882', // Moderator
-  '1449981020144402583', // Admin
 ];
 
 // Channel ID where ban logs will be posted
-const BAN_LOG_CHANNEL_ID = '1449984476418670695'; // Replace with your ban log channel ID
+const BAN_LOG_CHANNEL_ID = '745429566453186631'; // Replace with your ban log channel ID
 
 class BanCommandParams {
   @Param({ description: 'User to ban', required: true, type: ParamType.USER })

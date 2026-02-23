@@ -4,13 +4,13 @@ import { ChatInputCommandInteraction, ClientEvents, TextChannel, GuildMemberRole
 
 // Authorized roles that can run this command
 const AUTHORIZED_ROLES = [
+  '635885925003690006', // Admin
   '824719678475599882', // Moderator
-  '1449981020144402583', // Admin
 ];
 
 // Role IDs for role scanning
-const MEMBER_ROLE_ID = '1449994769005678603';
-const NEW_GUY_ROLE_ID = '1472855558246629376';
+const MEMBER_ROLE_ID = '1387180331085336616';
+const NEW_GUY_ROLE_ID = '745753270055862332';
 
 @Command({ 
   name: 'rolescan', 

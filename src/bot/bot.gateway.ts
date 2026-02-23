@@ -199,7 +199,6 @@ export class BotGateway {
   }
 
   async startPolling(forceNewMessage = false) {
-    return;
     const discordClient = this.discordProvider.getClient();
 
     const serverViewerChannel: TextChannel = discordClient.channels.cache.get(
