@@ -5,9 +5,10 @@ import { UsersController } from './users/users.controller';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MissionsController } from './missions/missions.controller';
+import { ServerController } from './server/server.controller';
 import { MongoModule } from 'nest-mongodb';
 import { DiscordModule } from '@discord-nestjs/core';
-import { GatewayIntentBits } from 'discord.js';
+import { GatewayIntentBits, Partials } from 'discord.js';
  
 
 @Module({
@@ -31,6 +32,13 @@ import { GatewayIntentBits } from 'discord.js';
             GatewayIntentBits.GuildMembers,
             GatewayIntentBits.MessageContent,
             GatewayIntentBits.GuildVoiceStates,
+            GatewayIntentBits.GuildMessageReactions,
+          ],
+          partials: [
+            Partials.Message,
+            Partials.Channel,
+            Partials.Reaction,
+            Partials.User,
           ],
         },
       }),
@@ -39,7 +47,7 @@ import { GatewayIntentBits } from 'discord.js';
     BotModule,
     MongoModule.forRoot(process.env.MONGO_HOST, 'prod'),
   ],
-  controllers: [UsersController, MissionsController, AppController],
+  controllers: [UsersController, MissionsController, ServerController, AppController],
   providers: [AppService],
 })
 export class AppModule {}
