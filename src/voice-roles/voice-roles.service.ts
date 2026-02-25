@@ -7,6 +7,10 @@ interface RoleMap {
   [channelId: string]: string; // VoiceChannelId: RoleId
 }
 
+interface ChannelMap {
+  [voiceChannelId: string]: string; // VoiceChannelId: TextChannelId
+}
+
 @Injectable()
 export class VoiceRolesService implements OnModuleInit {
   private readonly logger = new Logger(VoiceRolesService.name);
@@ -16,14 +20,25 @@ export class VoiceRolesService implements OnModuleInit {
     '1345427608145498122': '1383378111940399184',
     '1345427903101538345': '1383397786627604491',
     '1383360885057261628': '1383397817871106119',
+    '1345399702450999306': '1345400300261085258', //Test ID
+  };
+
+  // Map voice channels to their corresponding text channels for announcements
+  private readonly CHANNEL_MAP: ChannelMap = {
+    '1345427443485507595': '1383397063147913306', // Voice channel: Text channel for announcements
+    '1345427608145498122': '1383376631992684574',
+    '1345427903101538345': '1383397102469775390',
+    '1383360885057261628': '1383397137525768222',
+    '1345399702450999306': '1345421047054336042', //Test ID
   };
 
   // List of text channel IDs for message cleanup
   private readonly CLEANUP_CHANNEL_IDS: string[] = [
-    '1383397063147913306', // Replace with actual text channel IDs
+    '1383397063147913306', // Text channel IDs
     '1383376631992684574',
     '1383397102469775390',
     '1383397137525768222',
+    '1345421047054336042', //Test ID
   ];
 
   constructor(private readonly discordProvider: DiscordClientProvider) {}
@@ -58,6 +73,20 @@ export class VoiceRolesService implements OnModuleInit {
           try {
             await member.roles.add(roleId);
             this.logger.log(`Assigned role ${roleId} to ${member.user.tag}`);
+
+            // Post announcement message to the corresponding text channel
+            const textChannelId = this.CHANNEL_MAP[newState.channel.id];
+            if (textChannelId) {
+              const textChannel = member.guild.channels.cache.get(textChannelId);
+              if (textChannel && textChannel.isTextBased()) {
+                try {
+                  await textChannel.send(`${member.user} joined ${newState.channel.name}!`);
+                  this.logger.log(`Posted announcement for ${member.user.tag} joining ${newState.channel.name}`);
+                } catch (messageError) {
+                  this.logger.error(`Error posting announcement message: ${messageError}`);
+                }
+              }
+            }
           } catch (e) {
             this.logger.error(`Error adding role ${roleId} to ${member.user.tag}: ${e}`);
           }
