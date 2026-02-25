@@ -32,6 +32,7 @@
     "@nestjs/platform-fastify": "^10.4.15",
     "@nestjs/schedule": "^4.1.2",
     "@types/gamedig": "^5.0.3",
+    "axios": "^1.13.5",
     "chokidar": "^3.5.3",
     "discord.js": "14.11.0",
     "gamedig": "^5.2.0",
@@ -47,7 +48,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
-    "@nestjs/schematics": "9.0.4",
+    "@nestjs/schematics": "^10.0.1",
     "@nestjs/testing": "^10.4.15",
     "@types/express": "4.17.17",
     "@types/jest": "29.4.0",

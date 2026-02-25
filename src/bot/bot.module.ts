@@ -10,6 +10,7 @@ import { StartTimeCommand } from './commands/subcommands/starttime.command';
 import { SwearJarModule } from '../swear-jar/swear-jar.module';
 import { VoiceRolesModule } from '../voice-roles/voice-roles.module';
 import { PonyBotListener } from '../PonyBot/PonyBot.listener';
+import { ReactionHandler } from './events/reaction.handler';
 
 
 @Module({
@@ -21,12 +22,13 @@ import { PonyBotListener } from '../PonyBot/PonyBot.listener';
   ],
   exports: [DiscordModule],
   providers: [
-    BotGateway, 
-    TestServersCommands, 
+    BotGateway,
+    TestServersCommands,
     MainServerSubCommand,
     ConflictServerSubCommand,
     StartTimeCommand,
     PonyBotListener,
-],
+    ReactionHandler,
+  ],
 })
 export class BotModule { }
