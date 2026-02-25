@@ -34,7 +34,7 @@ export class VoiceRolesService implements OnModuleInit {
 
   // List of text channel IDs for message cleanup
   private readonly CLEANUP_CHANNEL_IDS: string[] = [
-    '1383397063147913306', // Replace with actual text channel IDs
+    '1383397063147913306', // Text channel IDs
     '1383376631992684574',
     '1383397102469775390',
     '1383397137525768222',
