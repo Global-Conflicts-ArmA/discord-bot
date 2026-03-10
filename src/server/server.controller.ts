@@ -213,6 +213,44 @@ export class ServerController {
         return { messageId: msg.id };
     }
 
+    @Post('/post-feedback')
+    async postFeedback(@Body() body: {
+        missionName: string;
+        status: string;
+        notes: string;
+        author: string;
+        channelId: string;
+        missionMaker?: string;
+    }): Promise<object> {
+        const discordClient = this.discordProvider.getClient();
+        let channel = discordClient.channels.cache.get(body.channelId);
+        if (!channel) {
+            channel = await discordClient.channels.fetch(body.channelId).catch(() => null);
+        }
+
+        if (!channel || channel.type !== ChannelType.GuildText) {
+            throw new Error(`Text channel ${body.channelId} not found`);
+        }
+
+        const embedBuilder = new EmbedBuilder()
+            .setTitle(`Mission Feedback: ${body.missionName}`)
+            .setDescription(body.notes || 'No additional notes provided.')
+            .addFields(
+                { name: 'Status', value: body.status, inline: true },
+                { name: 'Reported By', value: body.author, inline: true }
+            )
+            .setColor(body.status === 'No issues' ? '#22c55e' : body.status === 'New' ? '#3b82f6' : '#f97316');
+
+        if (body.missionMaker) {
+            embedBuilder.addFields({ name: 'Mission Maker', value: body.missionMaker, inline: false });
+        }
+
+        const textChannel = channel as TextChannel;
+        const msg = await textChannel.send({ embeds: [embedBuilder] });
+
+        return { messageId: msg.id };
+    }
+
     @Post('/edit-discord-message')
     async editDiscordMessage(@Body() body: {
         messageId: string;
@@ -263,10 +301,19 @@ export class ServerController {
         }
 
         // No outcome yet — just edit the existing message in-place (no notification needed)
-        const message = await thread.messages.fetch(body.messageId);
-        if (!message) {
-            throw new Error(`Message ${body.messageId} not found`);
+        let message;
+        try {
+            message = await thread.messages.fetch(body.messageId);
+        } catch (err) {
+            console.warn(`[edit-discord-message] Message ${body.messageId} not found (might have been deleted):`, err?.message);
         }
+
+        if (!message) {
+            // If the original message was deleted by a user, post a new one to recover gracefully
+            const newMsg = await thread.send({ embeds: [embedBuilder] });
+            return { ok: true, newMessageId: newMsg.id };
+        }
+
         await message.edit({ embeds: [embedBuilder] });
 
         return { ok: true };

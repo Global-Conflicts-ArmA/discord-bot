@@ -21,7 +21,6 @@ interface AdminStats {
 
 const MIN_PLAYERS_TO_OPEN = 10;
 const STALE_THRESHOLD_SECONDS = 600;
-const POLL_INTERVAL_MS = 2 * 60 * 1000;
 
 @Injectable()
 export class SessionService implements OnModuleInit {
@@ -37,8 +36,27 @@ export class SessionService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.closeOrphanedSessions();
     await this.createIndexes();
-    await this.poll();
-    setInterval(() => this.poll(), POLL_INTERVAL_MS);
+    this.runPollLoop();
+  }
+
+  private async runPollLoop() {
+    try {
+      await this.poll();
+    } catch (e) {
+      this.logger.error('Error during poll:', e);
+    }
+    
+    let intervalMs = 120000; // default 2 minutes
+    try {
+      const config = await this.db.collection('configs').findOne({}, { projection: { botPollIntervalMs: 1 } });
+      if (config && typeof config.botPollIntervalMs === 'number') {
+        intervalMs = config.botPollIntervalMs;
+      }
+    } catch (e) {
+      this.logger.error('Error reading botPollIntervalMs from DB:', e);
+    }
+
+    setTimeout(() => this.runPollLoop(), intervalMs);
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
@@ -46,7 +64,7 @@ export class SessionService implements OnModuleInit {
   private async closeOrphanedSessions(): Promise<void> {
     try {
       const result = await this.db.collection('server_sessions').updateMany(
-        { endedAt: null },
+        { endedAt: null, isPlaceholder: { $ne: true } },
         { $set: { endedAt: new Date(), endReason: 'stale' } },
       );
       if (result.modifiedCount > 0) {
@@ -132,18 +150,46 @@ export class SessionService implements OnModuleInit {
 
   private async openSession(stats: AdminStats): Promise<void> {
     const missionUniqueName = await this.matchMission(stats.mission);
-    const doc = {
-      startedAt: new Date(),
-      endedAt: null,
-      missionString: stats.mission,
+
+    // Look for a recent placeholder for this mission to "adopt"
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const placeholder = await this.db.collection('server_sessions').findOne({
       missionUniqueName,
-      snapshots: [],
-      peakPlayerCount: stats.players,
-      endReason: null,
-    };
-    const result = await this.db.collection('server_sessions').insertOne(doc);
-    this.activeSessionId = result.insertedId;
-    this.logger.log(`opened session ${this.activeSessionId} for "${stats.mission}" (${stats.players} players)`);
+      isPlaceholder: true,
+      endedAt: null,
+      startedAt: { $gte: oneHourAgo },
+    });
+
+    if (placeholder) {
+      this.activeSessionId = placeholder._id;
+      await this.db.collection('server_sessions').updateOne(
+        { _id: this.activeSessionId },
+        {
+          $set: {
+            isPlaceholder: false,
+            endReason: null,
+            startedAt: new Date(),
+            missionString: stats.mission, // Update with real string if it changed
+          },
+        },
+      );
+      this.logger.log(`adopted placeholder session ${this.activeSessionId} for "${stats.mission}"`);
+    } else {
+      const doc = {
+        startedAt: new Date(),
+        endedAt: null,
+        missionString: stats.mission,
+        missionUniqueName,
+        snapshots: [],
+        peakPlayerCount: stats.players,
+        endReason: null,
+      };
+      const result = await this.db.collection('server_sessions').insertOne(doc);
+      this.activeSessionId = result.insertedId;
+      this.logger.log(
+        `opened NEW session ${this.activeSessionId} for "${stats.mission}" (${stats.players} players)`,
+      );
+    }
   }
 
   private async closeSession(reason: string): Promise<void> {
