@@ -74,6 +74,14 @@ export class BanCommand {
         return;
       }
 
+      // Ban the user
+      const targetMember = await guild.members.fetch(userToBan.id).catch(() => null);
+      if (targetMember) {
+        await targetMember.ban({ reason: reason });
+      } else {
+        await guild.bans.create(userToBan.id, { reason: reason });
+      }
+
       // Delete user's messages from the last day
       const now = Date.now();
       const oneDayAgo = now - 24 * 60 * 60 * 1000;
@@ -94,14 +102,6 @@ export class BanCommand {
         } catch (error) {
           console.error(`Error deleting messages in channel ${channel.id}:`, error);
         }
-      }
-
-      // Ban the user
-      const targetMember = await guild.members.fetch(userToBan.id).catch(() => null);
-      if (targetMember) {
-        await targetMember.ban({ reason: reason });
-      } else {
-        await guild.bans.create(userToBan.id, { reason: reason });
       }
 
       // Post ban log to the designated channel
