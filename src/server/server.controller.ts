@@ -22,7 +22,7 @@ export class ServerController {
      * Called by the website when a GM clicks "Load Mission".
      */
     @Post('/set-scenario')
-    async setScenario(@Body() body: { scenarioId: string }): Promise<object> {
+    async setScenario(@Body() body: { scenarioId: string; missionString?: string }): Promise<object> {
         const configPath = process.env.REFORGER_SERVER_CONFIG_PATH;
         const scriptPath = process.env.MAIN_REFORGER_SERVER_START_SCRIPT_PATH;
 
@@ -32,6 +32,18 @@ export class ServerController {
             } catch (err) {
                 console.error('Failed to update config.json:', err);
                 // Not fatal — proceed to restart
+            }
+
+            // Write mission_context.json so start.ps1 can forward the human-readable
+            // mission name to the mock server's load signal during local development.
+            if (body.missionString) {
+                try {
+                    const fs = require('fs');
+                    const ctx = JSON.stringify({ missionString: body.missionString }, null, 2);
+                    fs.writeFileSync(`${configPath}\\mission_context.json`, ctx, 'utf8');
+                } catch (err) {
+                    console.error('Failed to write mission_context.json:', err);
+                }
             }
         }
 
@@ -201,6 +213,44 @@ export class ServerController {
         return { messageId: msg.id };
     }
 
+    @Post('/post-feedback')
+    async postFeedback(@Body() body: {
+        missionName: string;
+        status: string;
+        notes: string;
+        author: string;
+        channelId: string;
+        missionMaker?: string;
+    }): Promise<object> {
+        const discordClient = this.discordProvider.getClient();
+        let channel = discordClient.channels.cache.get(body.channelId);
+        if (!channel) {
+            channel = await discordClient.channels.fetch(body.channelId).catch(() => null);
+        }
+
+        if (!channel || channel.type !== ChannelType.GuildText) {
+            throw new Error(`Text channel ${body.channelId} not found`);
+        }
+
+        const embedBuilder = new EmbedBuilder()
+            .setTitle(`Mission Feedback: ${body.missionName}`)
+            .setDescription(body.notes || 'No additional notes provided.')
+            .addFields(
+                { name: 'Status', value: body.status, inline: true },
+                { name: 'Reported By', value: body.author, inline: true }
+            )
+            .setColor(body.status === 'No issues' ? '#22c55e' : body.status === 'New' ? '#3b82f6' : '#f97316');
+
+        if (body.missionMaker) {
+            embedBuilder.addFields({ name: 'Mission Maker', value: body.missionMaker, inline: false });
+        }
+
+        const textChannel = channel as TextChannel;
+        const msg = await textChannel.send({ embeds: [embedBuilder] });
+
+        return { messageId: msg.id };
+    }
+
     @Post('/edit-discord-message')
     async editDiscordMessage(@Body() body: {
         messageId: string;
@@ -217,28 +267,54 @@ export class ServerController {
             throw new Error(`Thread ${body.threadId} not found`);
         }
 
-        const message = await thread.messages.fetch(body.messageId);
-        if (!message) {
-            throw new Error(`Message ${body.messageId} not found`);
-        }
-
         const embedBuilder = new EmbedBuilder()
             .setDescription(body.embed.description)
             .setColor(body.embed.color as any);
         if (body.embed.footer) embedBuilder.setFooter({ text: body.embed.footer });
 
-        await message.edit({ embeds: [embedBuilder] });
-
+        // When the outcome is set: delete the original message and post a fresh one
+        // so that Discord notifies channel members who missed the original loading message
+        // (outcomes are typically posted 45-60 min after the loading message).
         if (body.addReactions && body.uniqueName) {
-            // Add reactions sequentially (order matters for Discord display)
-            await message.react('👍');
-            await message.react('🆗');
-            await message.react('👎');
+            // Delete the original loading message (best-effort; may already be gone)
+            try {
+                const oldMessage = await thread.messages.fetch(body.messageId);
+                await oldMessage.delete();
+                console.log(`[edit-discord-message] Deleted original messageId=${body.messageId}`);
+            } catch (err) {
+                console.warn(`[edit-discord-message] Could not delete original message ${body.messageId}:`, err?.message);
+            }
 
-            // Register this message so the reaction handler can find it
-            ratableMessages.set(body.messageId, { uniqueName: body.uniqueName, historyEntryId: body.historyEntryId });
-            console.log(`[edit-discord-message] Registered messageId=${body.messageId} as ratable for uniqueName=${body.uniqueName} historyEntryId=${body.historyEntryId} — ratableMessages size=${ratableMessages.size}`);
+            // Post a new message in the same thread so members see it as new activity
+            const newMessage = await thread.send({ embeds: [embedBuilder] });
+
+            // Add reactions sequentially (order matters for Discord display)
+            await newMessage.react('👍');
+            await newMessage.react('🆗');
+            await newMessage.react('👎');
+
+            // Register the NEW message so the reaction handler can find it
+            ratableMessages.set(newMessage.id, { uniqueName: body.uniqueName, historyEntryId: body.historyEntryId });
+            console.log(`[edit-discord-message] Replaced messageId=${body.messageId} with newMessageId=${newMessage.id} as ratable for uniqueName=${body.uniqueName} — ratableMessages size=${ratableMessages.size}`);
+
+            return { ok: true, newMessageId: newMessage.id };
         }
+
+        // No outcome yet — just edit the existing message in-place (no notification needed)
+        let message;
+        try {
+            message = await thread.messages.fetch(body.messageId);
+        } catch (err) {
+            console.warn(`[edit-discord-message] Message ${body.messageId} not found (might have been deleted):`, err?.message);
+        }
+
+        if (!message) {
+            // If the original message was deleted by a user, post a new one to recover gracefully
+            const newMsg = await thread.send({ embeds: [embedBuilder] });
+            return { ok: true, newMessageId: newMsg.id };
+        }
+
+        await message.edit({ embeds: [embedBuilder] });
 
         return { ok: true };
     }

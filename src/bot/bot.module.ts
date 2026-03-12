@@ -14,6 +14,7 @@ import { SwearJarModule } from '../swear-jar/swear-jar.module';
 import { VoiceRolesModule } from '../voice-roles/voice-roles.module';
 import { PonyBotListener } from '../PonyBot/PonyBot.listener';
 import { ReactionHandler } from './events/reaction.handler';
+import { SessionsModule } from '../sessions/sessions.module';
 
 
 @Module({
@@ -22,6 +23,7 @@ import { ReactionHandler } from './events/reaction.handler';
     ScheduleModule.forRoot(),
     SwearJarModule,
     VoiceRolesModule,
+    SessionsModule,
   ],
   exports: [DiscordModule],
   providers: [
