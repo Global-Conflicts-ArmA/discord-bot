@@ -5,8 +5,10 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   EmbedBuilder,
   StringSelectMenuBuilder,
+  ForumChannel,
   TextChannel,
 } from 'discord.js';
 
@@ -197,9 +199,9 @@ export class MissionsController {
   @Post('/new_history')
   async new_Hhistory(@Body() body): Promise<object> {
     const discordClient = this.discordProvider.getClient();
-    const channel: TextChannel = discordClient.channels.cache.get(
+    const channel: TextChannel | ForumChannel = discordClient.channels.cache.get(
       process.env.DISCORD_BOT_AAR_CHANNEL,
-    ) as TextChannel;
+    ) as TextChannel | ForumChannel;
 
     const leadersDescriptionText = body.leaders
       .map(function (elem) {
@@ -242,16 +244,36 @@ export class MissionsController {
 
     const row = new ActionRowBuilder<ButtonBuilder>({ components: [discordButton] })
 
-    const messageSent = await channel.send({
-      content: sendText,
+    if (body.discordThreadId) {
+      const thread = await discordClient.channels.fetch(body.discordThreadId).catch(() => null);
+      if (thread && thread.isThread()) {
+        await thread.send({
+          content: sendText,
+          embeds: [gameplayHistoryEmbed],
+          components: [row],
+        });
+        return {};
+      }
+    }
 
-      embeds: [gameplayHistoryEmbed],
-
-    });
-    await channel.send({
-      components: [row]
-    })
-    return;
+    if (channel.type === ChannelType.GuildForum) {
+      const forum = channel as any;
+      await forum.threads.create({
+        name: `${body.name} - AAR`,
+        message: {
+          content: sendText,
+          embeds: [gameplayHistoryEmbed],
+          components: [row],
+        }
+      });
+    } else {
+      await channel.send({
+        content: sendText,
+        embeds: [gameplayHistoryEmbed],
+        components: [row],
+      });
+    }
+    return {};
   }
 
   @Post('/first_vote')
