@@ -1,6 +1,6 @@
 import { DiscordClientProvider } from '@discord-nestjs/core';
 import { Body, Controller, Post } from '@nestjs/common';
-import { ChannelType, EmbedBuilder, ForumChannel, TextChannel, ThreadChannel } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, ForumChannel, TextChannel, ThreadChannel } from 'discord.js';
 import { updateDefaultScenario } from '../helpers/reforger_server';
 import { spawn } from 'child_process';
 import { handleServerData } from '../helpers/reforger_server';
@@ -286,12 +286,19 @@ export class ServerController {
             }
 
             // Post a new message in the same thread so members see it as new activity
-            const newMessage = await thread.send({ embeds: [embedBuilder] });
+            const discordButton = new ButtonBuilder()
+                .setLabel('Rate this mission')
+                .setCustomId(`reforgerRate_${body.uniqueName}_${body.historyEntryId}`)
+                .setStyle(ButtonStyle.Primary);
+
+            const row = new ActionRowBuilder<ButtonBuilder>({ components: [discordButton] });
+
+            const newMessage = await thread.send({ embeds: [embedBuilder], components: [row] });
 
             // Add reactions sequentially (order matters for Discord display)
-            await newMessage.react('👍');
-            await newMessage.react('🆗');
-            await newMessage.react('👎');
+            // await newMessage.react('👍');
+            // await newMessage.react('🆗');
+            // await newMessage.react('👎');
 
             // Register the NEW message so the reaction handler can find it
             ratableMessages.set(newMessage.id, { uniqueName: body.uniqueName, historyEntryId: body.historyEntryId });

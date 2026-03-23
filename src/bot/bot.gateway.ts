@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { DiscordClientProvider, On, Once } from '@discord-nestjs/core';
 import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 
 import { ActionRowBuilder, ActivityType, EmbedBuilder, Interaction, StringSelectMenuBuilder, TextChannel } from 'discord.js';
 import * as fs from 'fs';
@@ -83,6 +84,96 @@ export class BotGateway {
         return;
       }
     }
+    if (interaction.isButton() && interaction.customId && interaction.customId.startsWith('reforgerRate_')) {
+      const parts = interaction.customId.split('_');
+      // parts[0] = 'reforgerRate', parts[1] = uniqueName, parts[2] = historyEntryId
+      const uniqueName = parts[1];
+      const historyEntryId = parts[2] || 'unknown';
+      const clicker = interaction.user;
+
+      const missionFound = await this.db.collection('reforger_mission_metadata').findOne({
+        missionId: uniqueName
+      }) || await this.db.collection('reforger_mission_metadata').findOne({
+        uniqueName: uniqueName
+      });
+
+      if (missionFound && missionFound.authorID == clicker.id) {
+        await interaction.reply({
+          content: 'You can\'t rate your own mission. 🤓',
+          ephemeral: true,
+        });
+        return;
+      }
+      
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(`reforgerRateSelect_${uniqueName}_${historyEntryId}`)
+            .setPlaceholder('Rate this specific session:')
+            .addOptions(
+              {
+                label: 'Good',
+                description: 'I liked this mission.',
+                emoji: "👍",
+                value: 'positive',
+              },
+              {
+                label: 'Okay',
+                description: 'This mission was fine.',
+                emoji: "🆗",
+                value: 'neutral',
+              },
+              {
+                label: 'Bad',
+                description: 'I did not like this mission.',
+                emoji: "👎",
+                value: 'negative',
+              },
+            ),
+        );
+
+      await interaction.reply({
+        content: 'Submit your rating:',
+        ephemeral: true,
+        components: [row]
+      });
+      return;
+    }
+
+    if (interaction.isAnySelectMenu() && interaction.customId && interaction.customId.startsWith('reforgerRateSelect_')) {
+      await interaction.deferUpdate();
+      const parts = interaction.customId.split('_');
+      const uniqueName = parts[1];
+      const historyEntryId = parts[2] || 'unknown';
+      const clicker = interaction.user;
+      const value = interaction.values[0];
+
+      const websiteUrl = process.env.WEBSITE_URL ?? 'http://globalconflicts.net';
+      const url = `${websiteUrl}/api/reforger-missions/${uniqueName}/rate_mission`;
+      try {
+        await axios.post(
+          url,
+          { value: value, discordUserId: clicker.id, historyEntryId: historyEntryId },
+          {
+            headers: { 'x-api-secret': process.env.API_SECRET },
+            timeout: 5000,
+          }
+        );
+      } catch (error) {
+        console.error("Error posting reforger rating", error);
+      }
+
+      if (value == "negative") {
+        await interaction.editReply({ content: "Rating submited! 📝 If you didn't enjoy this mission, consider writing a constructive review for the mission maker.", components: [] })
+      } else {
+        await interaction.editReply({
+          content: 'Thanks for your input!',
+          components: []
+        });
+      };
+      return;
+    }
+
     if (interaction.channelId == process.env.DISCORD_BOT_AAR_CHANNEL) {
       if (interaction.isButton() && interaction.customId) {
         const uniqueName = interaction.customId;
@@ -111,23 +202,23 @@ export class BotGateway {
           .addComponents(
             new StringSelectMenuBuilder()
               .setCustomId(uniqueName)
-              .setPlaceholder('Rate this mission:')
+              .setPlaceholder('Rate this playthrough:')
               .addOptions(
                 {
-                  label: 'Good',
-                  description: 'The mission is well made and interesting.',
+                  label: 'Great',
+                  description: 'This was a great playthrough',
                   emoji: "👍",
                   value: 'positive',
                 },
                 {
-                  label: 'It\'s alright',
-                  description: 'Just a regular enjoyable mission.',
+                  label: 'OK',
+                  description: 'This was a perfectly OK playthrough',
                   emoji: "🆗",
                   value: 'neutral',
                 },
                 {
                   label: 'Bad',
-                  description: 'The mission has concept issues.',
+                  description: 'I did not enjoy this playthrough',
                   emoji: "👎",
                   value: 'negative',
                 },
