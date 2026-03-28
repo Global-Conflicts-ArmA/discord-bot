@@ -244,7 +244,7 @@ export class SessionService implements OnModuleInit {
   }
 
   private async matchMission(missionString: string): Promise<string | null> {
-    const m = missionString.match(/^\w+\s+\(\d+-\d+\)\s+(.+)$/);
+    const m = missionString.match(/^\w+\s+\([^)]+\)\s+(.+)$/);
     if (!m) return null;
     const name = m[1].trim();
     // Replace any run of non-alphanumeric chars (spaces, hyphens, underscores…)
