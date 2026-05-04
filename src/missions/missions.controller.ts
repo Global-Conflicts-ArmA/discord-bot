@@ -237,23 +237,24 @@ export class MissionsController {
       gameplayHistoryEmbed.addFields({ name: 'AAR Replay:', value: body.aarReplayLink });
     }
     gameplayHistoryEmbed.addFields({ name: leaderText, value: leadersFieldText });
-    const discordButton = new ButtonBuilder()
-      .setLabel('Rate this mission')
-      .setCustomId(body.uniqueName)
-      .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder<ButtonBuilder>({ components: [discordButton] })
+    const componentsToAttach = [];
+    if (body.outcome && typeof body.outcome === 'string' && body.outcome.trim() !== '') {
+      const discordButton = new ButtonBuilder()
+        .setLabel('Rate this mission')
+        .setCustomId(body.uniqueName)
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>({ components: [discordButton] });
+      componentsToAttach.push(row);
+    }
 
     if (body.discordThreadId) {
-      const thread = await discordClient.channels.fetch(body.discordThreadId).catch(() => null);
-      if (thread && thread.isThread()) {
-        await thread.send({
-          content: sendText,
-          embeds: [gameplayHistoryEmbed],
-          components: [row],
-        });
-        return {};
-      }
+      // For missions using the new live-session system (Reforger), the outcome notification
+      // is handled by the server.controller's edit-discord-message endpoint which
+      // deletes the old 'loading' message and posts a fresh one to trigger a notification.
+      // We skip the legacy 'New mission history recorded!' message here to avoid double-posting.
+      return {};
     }
 
     if (channel.type === ChannelType.GuildForum) {
@@ -263,14 +264,14 @@ export class MissionsController {
         message: {
           content: sendText,
           embeds: [gameplayHistoryEmbed],
-          components: [row],
+          components: componentsToAttach,
         }
       });
     } else {
       await channel.send({
         content: sendText,
         embeds: [gameplayHistoryEmbed],
-        components: [row],
+        components: componentsToAttach,
       });
     }
     return {};
