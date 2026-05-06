@@ -22,6 +22,8 @@ export class MissionsController {
 
   @Post('/new')
   async newMission(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     console.log(body);
     const newMissionEmbed = new EmbedBuilder()
 
@@ -59,10 +61,14 @@ export class MissionsController {
       embeds: [newMissionEmbed]
     });
     return;
+    */
+    return {};
   }
 
   @Post('/update')
   async update(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
 
     const discordClient = this.discordProvider.getClient();
     let missionAuthor = await discordClient.users.fetch(body.missionAuthor);
@@ -99,10 +105,14 @@ export class MissionsController {
     ) as TextChannel;
     await channel.send({ content: `${body.updateAuthor} updated a mission!`, embeds: [newMissionEmbed] });
     return;
+    */
+    return {};
   }
 
   @Post('/request_audit')
   async requestAudit(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const newMissionEmbed = new EmbedBuilder()
       .setColor('#22cf26')
       .setTitle(body.name)
@@ -120,9 +130,13 @@ export class MissionsController {
       embeds: [newMissionEmbed],
     });
     return;
+    */
+    return {};
   }
   @Post('/request_audit_cancel')
   async requestAuditCancel(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const newMissionEmbed = new EmbedBuilder()
       .setColor('#ff2020')
       .setTitle(body.name)
@@ -140,10 +154,14 @@ export class MissionsController {
       embeds: [newMissionEmbed],
     });
     return;
+    */
+    return {};
   }
 
   @Post('/audit_submited')
   async auditSubmited(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const discordClient = this.discordProvider.getClient();
     const channel: TextChannel = discordClient.channels.cache.get(
       process.env.DISCORD_BOT_CHANNEL,
@@ -194,10 +212,14 @@ export class MissionsController {
     }
 
     return;
+    */
+    return {};
   }
 
   @Post('/new_history')
   async new_Hhistory(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const discordClient = this.discordProvider.getClient();
     const channel: TextChannel | ForumChannel = discordClient.channels.cache.get(
       process.env.DISCORD_BOT_AAR_CHANNEL,
@@ -275,10 +297,14 @@ export class MissionsController {
       });
     }
     return {};
+    */
+    return {};
   }
 
   @Post('/first_vote')
   async firstVote(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const discordClient = this.discordProvider.getClient();
     const channel: TextChannel = discordClient.channels.cache.get(
       process.env.DISCORD_VOTING_CHANNEL,
@@ -308,10 +334,14 @@ export class MissionsController {
     });
 
     return;
+    */
+    return {};
   }
 
   @Post('/bugreport')
   async bugreport(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const embed = new EmbedBuilder()
       .setColor('#ff0000')
       .setTitle(`Mission: ${body.name}`)
@@ -336,10 +366,14 @@ export class MissionsController {
       embeds: [embed],
     });
     return;
+    */
+    return {};
   }
 
   @Post('/review')
   async review(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const embed = new EmbedBuilder()
       .setColor('#ff0000')
       .setTitle(`Mission: ${body.name}`)
@@ -360,10 +394,14 @@ export class MissionsController {
       embeds: [embed],
     });
     return;
+    */
+    return {};
   }
 
   @Post('/aar')
   async aar(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const embed = new EmbedBuilder()
       .setColor('#ff0000')
       .setTitle(`Mission: ${body.name}`)
@@ -381,10 +419,14 @@ export class MissionsController {
       embeds: [embed],
     });
     return;
+    */
+    return {};
   }
 
   @Post('/media_posted')
   async mediaPosted(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     console.log('POSTING MEDIA');
     const embed = new EmbedBuilder()
       .setColor('#0000FF')
@@ -415,10 +457,14 @@ export class MissionsController {
     }
 
     return;
+    */
+    return {};
   }
 
   @Post('/youtube_video_uploaded')
   async youtubeVideoUploaded(@Body() body): Promise<object> {
+    /* Legacy Discord notification disabled
+
     const discordClient = this.discordProvider.getClient();
     const channel: TextChannel = discordClient.channels.cache.get(
       process.env.PR_VIDEO_VERIFICATION_CHANNEL_ID,
@@ -429,5 +475,7 @@ export class MissionsController {
     });
 
     return;
+    */
+    return {};
   }
 }
