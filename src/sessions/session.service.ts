@@ -63,12 +63,38 @@ export class SessionService implements OnModuleInit {
 
   private async closeOrphanedSessions(): Promise<void> {
     try {
-      const result = await this.db.collection('server_sessions').updateMany(
+      // Close real sessions with their last snapshot time (or now if none)
+      const realResult = await this.db.collection('server_sessions').updateMany(
         { endedAt: null, isPlaceholder: { $ne: true } },
-        { $set: { endedAt: new Date(), endReason: 'stale' } },
+        [
+          {
+            $set: {
+              endedAt: {
+                $ifNull: [{ $arrayElemAt: ['$snapshots.time', -1] }, new Date()],
+              },
+              endReason: 'stale',
+            },
+          },
+        ],
       );
-      if (result.modifiedCount > 0) {
-        this.logger.log(`closed ${result.modifiedCount} orphaned session(s) from previous run`);
+      // Close placeholders with their startedAt (0 duration)
+      const placeholderResult = await this.db.collection('server_sessions').updateMany(
+        { endedAt: null, isPlaceholder: true },
+        [
+          {
+            $set: {
+              endedAt: '$startedAt',
+              endReason: 'stale',
+            },
+          },
+        ],
+      );
+
+      const totalClosed = realResult.modifiedCount + placeholderResult.modifiedCount;
+      if (totalClosed > 0) {
+        this.logger.log(
+          `closed ${totalClosed} orphaned session(s) from previous run (${realResult.modifiedCount} real, ${placeholderResult.modifiedCount} placeholders)`,
+        );
       }
     } catch (err) {
       this.logger.error('failed to close orphaned sessions', err);
@@ -109,7 +135,7 @@ export class SessionService implements OnModuleInit {
       if (ageSeconds > STALE_THRESHOLD_SECONDS) {
         this.logger.warn(`stats are stale (${Math.round(ageSeconds)}s old)`);
         if (this.activeSessionId) {
-          await this.closeSession('stale');
+          await this.closeSession('stale', new Date(stats.updated * 1000));
         }
         this.updateBaseline(stats);
         return;
@@ -192,13 +218,21 @@ export class SessionService implements OnModuleInit {
     }
   }
 
-  private async closeSession(reason: string): Promise<void> {
+  private async closeSession(reason: string, endTime?: Date): Promise<void> {
     if (!this.activeSessionId) return;
+
+    // Use provided endTime (e.g. from stale stats), or lastKnown activity, or current time
+    const endedAt =
+      endTime ??
+      (this.lastUpdated > 0 ? new Date(this.lastUpdated * 1000) : new Date());
+
     await this.db.collection('server_sessions').updateOne(
       { _id: this.activeSessionId },
-      { $set: { endedAt: new Date(), endReason: reason } },
+      { $set: { endedAt, endReason: reason } },
     );
-    this.logger.log(`closed session ${this.activeSessionId} (reason: ${reason})`);
+    this.logger.log(
+      `closed session ${this.activeSessionId} (reason: ${reason}, endedAt: ${endedAt.toISOString()})`,
+    );
     this.activeSessionId = null;
   }
 

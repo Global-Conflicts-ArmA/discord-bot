@@ -102,8 +102,6 @@ export class ServerController {
 
         if (channel.type === ChannelType.GuildForum) {
             // ── Forum channel: each session is a forum post ──
-            // Only reuse a post if we have an explicit threadId from activeSession.
-            // No name-based fallback — if activeSession was cleared, always start fresh.
             const forum = channel as ForumChannel;
 
             if (body.threadId) {
@@ -114,6 +112,15 @@ export class ServerController {
                 });
                 thread = fetched as ThreadChannel;
                 console.log(`[post-discord-message] Found by ID: ${!!thread}`);
+            }
+
+            // Name-based fallback if not found by ID or ID was missing
+            if (!thread && body.threadName) {
+                console.log(`[post-discord-message] Searching for forum post by name "${body.threadName}"`);
+                const activeThreads = await forum.threads.fetchActive();
+                const found = activeThreads.threads.find((t) => t.name === body.threadName);
+                thread = found as ThreadChannel ?? null;
+                if (thread) console.log(`[post-discord-message] Found existing forum post by name: ${thread.id}`);
             }
 
             if (!thread) {

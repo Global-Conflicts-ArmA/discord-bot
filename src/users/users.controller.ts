@@ -1,5 +1,5 @@
 import { DiscordClientProvider } from '@discord-nestjs/core';
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { Routes } from 'discord.js';
 
 @Controller('users')
@@ -57,6 +57,30 @@ export class UsersController {
     );
 
     return donatorRole.members;
+  }
+
+  @Get('/role-members')
+  async findRoleMembers(@Query('roleId') roleId: string): Promise<object> {
+    const client = this.discordProvider.getClient();
+    const guildId = process.env.DISCORD_SERVER_ID;
+    const gcGuild = client.guilds.cache.get(guildId);
+
+    const targetRoleId =
+      roleId || process.env.DISCORD_MEMBER_ROLE_ID;
+
+    await gcGuild.roles.fetch();
+    await gcGuild.members.fetch();
+
+    const role = gcGuild.roles.cache.get(targetRoleId);
+    if (!role) {
+      return { ok: false, error: 'Role not found' };
+    }
+
+    return {
+      ok: true,
+      roleId: targetRoleId,
+      memberIds: role.members.map((m) => m.id),
+    };
   }
 
   @Get('/:id')
