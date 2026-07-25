@@ -1,6 +1,17 @@
 import { SlashCommandPipe } from '@discord-nestjs/common';
-import { Command, EventParams, Handler, InteractionEvent, Param } from '@discord-nestjs/core';
-import { ChannelType, ChatInputCommandInteraction, ClientEvents, GuildMember } from 'discord.js';
+import {
+  Command,
+  EventParams,
+  Handler,
+  InteractionEvent,
+  Param,
+} from '@discord-nestjs/core';
+import {
+  ChannelType,
+  ChatInputCommandInteraction,
+  ClientEvents,
+  GuildMember,
+} from 'discord.js';
 import * as mongo from 'mongodb';
 import { InjectDb } from 'nest-mongodb';
 import { isEventOpsAdmin, MONGO_COLLECTIONS } from '../event-ops.constants';
@@ -8,7 +19,11 @@ import { isEventOpsAdmin, MONGO_COLLECTIONS } from '../event-ops.constants';
 // TEMPORARY command — see README.md in temp-event-ops/.
 
 class EventConfigParams {
-  @Param({ description: 'Category ID all event channels get created under (Copy Channel ID, Developer Mode required)', required: true })
+  @Param({
+    description:
+      'Category ID all event channels get created under (Copy Channel ID, Developer Mode required)',
+    required: true,
+  })
   category_id: string;
 }
 
@@ -28,13 +43,21 @@ export class EventConfigCommand {
     const member = interaction.member as GuildMember | null;
 
     if (!isEventOpsAdmin(member)) {
-      await interaction.reply({ content: 'You do not have permission to run this command.', ephemeral: true });
+      await interaction.reply({
+        content: 'You do not have permission to run this command.',
+        ephemeral: true,
+      });
       return;
     }
 
-    const channel = interaction.guild?.channels.cache.get(options.category_id.trim());
+    const channel = interaction.guild?.channels.cache.get(
+      options.category_id.trim(),
+    );
     if (!channel || channel.type !== ChannelType.GuildCategory) {
-      await interaction.reply({ content: 'That ID does not match a category channel in this server.', ephemeral: true });
+      await interaction.reply({
+        content: 'That ID does not match a category channel in this server.',
+        ephemeral: true,
+      });
       return;
     }
 

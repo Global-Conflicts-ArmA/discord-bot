@@ -14,7 +14,9 @@ export const MONGO_COLLECTIONS = {
   slots: 'tempEventOps_slots',
 };
 
-export function isEventOpsAdmin(member: GuildMember | null | undefined): boolean {
+export function isEventOpsAdmin(
+  member: GuildMember | null | undefined,
+): boolean {
   if (!member) return false;
   if (SUPER_USER_IDS.includes(member.id)) return true;
   const adminRoleId = process.env.DISCORD_ADMIN_ROLE_ID;

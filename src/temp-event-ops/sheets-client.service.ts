@@ -49,7 +49,10 @@ export class SheetsClientService {
     return match ? match[1] : null;
   }
 
-  private async getTabValues(sheetId: string, tabName: string): Promise<string[][]> {
+  private async getTabValues(
+    sheetId: string,
+    tabName: string,
+  ): Promise<string[][]> {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: `'${tabName}'!A:Z`,
@@ -66,7 +69,9 @@ export class SheetsClientService {
     const slotListsIdx = headers.indexOf('Slot lists');
 
     if (missionIdx === -1 || slotListsIdx === -1) {
-      throw new Error(`"${EVENT_OVERVIEW_TAB}" tab must have "Mission Number" and "Slot lists" columns.`);
+      throw new Error(
+        `"${EVENT_OVERVIEW_TAB}" tab must have "Mission Number" and "Slot lists" columns.`,
+      );
     }
 
     const rows: EventOverviewRow[] = [];
@@ -77,7 +82,10 @@ export class SheetsClientService {
       rows.push({
         missionNumber,
         description: descIdx !== -1 ? (row[descIdx] || '').trim() : '',
-        slotLists: slotListsRaw.split(',').map((s) => s.trim()).filter(Boolean),
+        slotLists: slotListsRaw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
       });
     }
     return rows;
@@ -102,30 +110,46 @@ export class SheetsClientService {
       throw new Error(`Tab "${tabName}" must have a "SlotID" column.`);
     }
 
-    return values
-      .slice(1)
-      .map((row, i) => ({
-        rowIndex: i,
-        SlotID: row[idx.SlotID] || '',
-        Section: idx.Section !== -1 ? row[idx.Section] || '' : '',
-        Role: idx.Role !== -1 ? row[idx.Role] || '' : '',
-        Player: idx.Player !== -1 ? row[idx.Player] || '' : '',
-        Description: idx.Description !== -1 ? row[idx.Description] || '' : '',
-        'Discord User ID': idx.DiscordUserId !== -1 ? row[idx.DiscordUserId] || '' : '',
-      }))
-      // Sheets use blank rows as visual spacers between sections — those
-      // aren't real slots, so skip anything with no SlotID.
-      .filter((row) => row.SlotID !== '');
+    return (
+      values
+        .slice(1)
+        .map((row, i) => ({
+          rowIndex: i,
+          SlotID: row[idx.SlotID] || '',
+          Section: idx.Section !== -1 ? row[idx.Section] || '' : '',
+          Role: idx.Role !== -1 ? row[idx.Role] || '' : '',
+          Player: idx.Player !== -1 ? row[idx.Player] || '' : '',
+          Description: idx.Description !== -1 ? row[idx.Description] || '' : '',
+          'Discord User ID':
+            idx.DiscordUserId !== -1 ? row[idx.DiscordUserId] || '' : '',
+        }))
+        // Sheets use blank rows as visual spacers between sections — those
+        // aren't real slots, so skip anything with no SlotID.
+        .filter((row) => row.SlotID !== '')
+    );
   }
 
-  async setSlotOccupant(sheetId: string, tabName: string, rowIndex: number, player: string, discordUserId: string): Promise<void> {
-    await this.writeSlotFields(sheetId, tabName, rowIndex, { Player: player, 'Discord User ID': discordUserId });
+  async setSlotOccupant(
+    sheetId: string,
+    tabName: string,
+    rowIndex: number,
+    player: string,
+    discordUserId: string,
+  ): Promise<void> {
+    await this.writeSlotFields(sheetId, tabName, rowIndex, {
+      Player: player,
+      'Discord User ID': discordUserId,
+    });
   }
 
   // Appends a row to the sheet's "History" tab: Timestamp | User | Action.
   // Best-effort and silent on failure — this is a nice-to-have audit trail,
   // not something that should ever block a command.
-  async logHistory(sheetId: string, actor: string, action: string): Promise<void> {
+  async logHistory(
+    sheetId: string,
+    actor: string,
+    action: string,
+  ): Promise<void> {
     try {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: sheetId,
@@ -166,11 +190,23 @@ export class SheetsClientService {
     });
   }
 
-  async clearSlotOccupant(sheetId: string, tabName: string, rowIndex: number): Promise<void> {
-    await this.writeSlotFields(sheetId, tabName, rowIndex, { Player: '', 'Discord User ID': '' });
+  async clearSlotOccupant(
+    sheetId: string,
+    tabName: string,
+    rowIndex: number,
+  ): Promise<void> {
+    await this.writeSlotFields(sheetId, tabName, rowIndex, {
+      Player: '',
+      'Discord User ID': '',
+    });
   }
 
-  private async writeSlotFields(sheetId: string, tabName: string, rowIndex: number, fields: Record<string, string>): Promise<void> {
+  private async writeSlotFields(
+    sheetId: string,
+    tabName: string,
+    rowIndex: number,
+    fields: Record<string, string>,
+  ): Promise<void> {
     const values = await this.getTabValues(sheetId, tabName);
     if (values.length < 1) throw new Error(`Tab "${tabName}" is empty.`);
     const headers = values[0].map((h) => (h || '').trim());
@@ -180,7 +216,10 @@ export class SheetsClientService {
     for (const [fieldName, value] of Object.entries(fields)) {
       const colIdx = headers.indexOf(fieldName);
       if (colIdx === -1) continue;
-      data.push({ range: `'${tabName}'!${columnLetter(colIdx)}${sheetRow}`, values: [[value]] });
+      data.push({
+        range: `'${tabName}'!${columnLetter(colIdx)}${sheetRow}`,
+        values: [[value]],
+      });
     }
     if (data.length === 0) return;
 

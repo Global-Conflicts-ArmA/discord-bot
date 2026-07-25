@@ -125,8 +125,12 @@ export function groupBySection(
   const sections = new Map<string, EventOpsSlot[]>();
   for (const slot of slots) {
     const section = slot.section || 'Unknown';
-    if (!sections.has(section)) sections.set(section, []);
-    sections.get(section)!.push(slot);
+    const existing = sections.get(section);
+    if (existing) {
+      existing.push(slot);
+    } else {
+      sections.set(section, [slot]);
+    }
   }
   return sections;
 }
