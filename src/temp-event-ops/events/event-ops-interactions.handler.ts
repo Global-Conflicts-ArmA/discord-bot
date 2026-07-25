@@ -20,6 +20,7 @@ import {
   searchMissionSheetNames,
   searchOpenSlots,
 } from '../event-ops.helpers';
+import { EventOpsSlot } from '../event-ops.types';
 import { EVENT_OPS_CUSTOM_IDS } from '../message-formatter';
 import { SheetsClientService } from '../sheets-client.service';
 
@@ -69,7 +70,7 @@ export class EventOpsInteractionsHandler {
     }
     if (
       interaction.isStringSelectMenu() &&
-      interaction.customId === EVENT_OPS_CUSTOM_IDS.selectSlot
+      interaction.customId.startsWith(EVENT_OPS_CUSTOM_IDS.selectSlot)
     ) {
       await this.selectSlot(interaction);
       return;
@@ -181,19 +182,36 @@ export class EventOpsInteractionsHandler {
       return;
     }
 
-    const shown = open.slice(0, 25);
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId(EVENT_OPS_CUSTOM_IDS.selectSlot)
-      .setPlaceholder('Pick a slot to join')
-      .addOptions(
-        shown.map((s) => ({
-          label: `#${s.slotId} — ${s.role}`.slice(0, 100),
-          description: s.section.slice(0, 100),
-          value: s.slotId,
-        })),
-      );
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>({
-      components: [menu],
+    // A select menu caps out at 25 options, but Discord allows up to 5 action
+    // rows per message — so instead of truncating to the first 25 and
+    // punting everyone else to staff, split into up to 5 dropdowns of 25
+    // (125 total), each labeled with the slot range it covers.
+    const MAX_MENUS = 5;
+    const MENU_SIZE = 25;
+    const shown = open.slice(0, MAX_MENUS * MENU_SIZE);
+    const chunks: EventOpsSlot[][] = [];
+    for (let i = 0; i < shown.length; i += MENU_SIZE) {
+      chunks.push(shown.slice(i, i + MENU_SIZE));
+    }
+
+    const rows = chunks.map((chunk, i) => {
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`${EVENT_OPS_CUSTOM_IDS.selectSlot}:${i}`)
+        .setPlaceholder(
+          `Slots #${chunk[0].slotId}-#${
+            chunk[chunk.length - 1].slotId
+          } — pick one`,
+        )
+        .addOptions(
+          chunk.map((s) => ({
+            label: `#${s.slotId} — ${s.role}`.slice(0, 100),
+            description: s.section.slice(0, 100),
+            value: s.slotId,
+          })),
+        );
+      return new ActionRowBuilder<StringSelectMenuBuilder>({
+        components: [menu],
+      });
     });
 
     const note =
@@ -204,7 +222,7 @@ export class EventOpsInteractionsHandler {
         : '';
     await interaction.reply({
       content: `**Open slots:**${note}`,
-      components: [row],
+      components: rows,
       ephemeral: true,
     });
   }
