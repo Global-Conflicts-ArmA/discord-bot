@@ -26,6 +26,7 @@ export class PonyBotListener {
   @On('messageCreate')
   async onMessage(message: Message): Promise<void> {
     if (message.author.bot) return;
+    if (!message.channel.isSendable()) return;
 
     if (this.EXCLUDED_CHANNEL_IDS.includes(message.channel.id)) return;
 
@@ -47,7 +48,9 @@ export class PonyBotListener {
     const triggerCooldown = this.cooldowns[trigger];
     if (triggerCooldown && now < triggerCooldown) {
       const timeLeft = Math.ceil((triggerCooldown - now) / 1000);
-      await message.channel.send(`${trigger} is on cooldown! ${timeLeft} seconds remaining.`);
+      await message.channel.send(
+        `${trigger} is on cooldown! ${timeLeft} seconds remaining.`,
+      );
       return;
     }
 
