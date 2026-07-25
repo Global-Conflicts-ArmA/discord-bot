@@ -35,7 +35,7 @@ Live slot state (who's in what slot) lives in Mongo (`tempEventOps_slots`), not 
 
 ## Roster display: embeds, not code blocks
 
-Each section's roster is a Discord embed (`formatSectionMessage` in `message-formatter.ts`), not a monospace table — one inline field per slot (`#12 Machine Gunner` → `Open`/`Blocked`/player name), title = section name, and a footer note if any slot in that section is blocked. Color is picked from the mission/tab name: contains `USSR` → red, contains `US` (checked *after* `USSR`, since `"USSR".includes("US")` is true) → blue, otherwise neutral grey — see `colorForMission()`.
+Each section's roster is a Discord embed (`formatSectionMessage` in `message-formatter.ts`), not a monospace table — one inline field per slot (`#12 Machine Gunner` → `🟩 Open` / `🟧 {player name}` / `🟥 Blocked`), title = section name, and a footer note if any slot in that section is blocked. Color is picked from the mission/tab name: contains `USSR` → red, contains `US` (checked *after* `USSR`, since `"USSR".includes("US")` is true) → blue, otherwise neutral grey — see `colorForMission()`.
 
 The mission description no longer gets its own message — it lives in the **channel topic** instead (`buildMissionChannelTopic`, set via `topic:` at channel creation). Topics cap at 1024 characters: the sheet link + sign-up instructions are fixed-length and take priority, the free-text description gets truncated with `…` if there isn't room for all of it. This also means there's no separate spacer message needed anymore — the first thing posted in the channel is the first section's roster embed.
 

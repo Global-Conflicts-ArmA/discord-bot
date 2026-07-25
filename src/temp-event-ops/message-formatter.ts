@@ -94,10 +94,10 @@ export function formatSectionMessage(
 
   const fields = slots.slice(0, 25).map((s) => {
     const blocked = (s.player || '').toLowerCase().includes('blocked');
-    const value = blocked ? 'Blocked' : s.player ? s.player : 'Open';
+    const value = blocked ? '🟥 Blocked' : s.player ? `🟧 ${s.player}` : '🟩 Open';
     return {
       name: `#${s.slotId} ${s.role || 'Unknown'}`.slice(0, 256),
-      value: value.slice(0, 1024) || 'Open',
+      value: value.slice(0, 1024) || '🟩 Open',
       inline: true,
     };
   });
