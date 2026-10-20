@@ -15,11 +15,11 @@ import {
   Role,
 } from 'discord.js';
 
-const COMMAND_SETTINGS = {
-  adminRoleId: process.env.DISCORD_ADMIN_ROLE_ID,
-  gameModeratorRoleId: process.env.DISCORD_GAME_MODERATOR_ROLE_ID,
-  memberRoleId: process.env.DISCORD_MEMBER_ROLE_ID,
-};
+interface CountCommandSettings {
+  adminRoleId: string;
+  gameModeratorRoleId: string;
+  memberRoleId: string;
+}
 
 interface PollAnswerResult {
   label: string;
@@ -31,7 +31,7 @@ interface PollAnswerResult {
 
 function resolveRoleBucket(
   roleIds: string[],
-  settings: typeof COMMAND_SETTINGS,
+  settings: CountCommandSettings,
 ): 'Admins' | 'Game Moderators' | 'Members' | null {
   if (roleIds.includes(settings.adminRoleId)) {
     return 'Admins';
@@ -112,10 +112,15 @@ export class CountCommand {
       return;
     }
 
+    const commandSettings = {
+      adminRoleId: process.env.DISCORD_ADMIN_ROLE_ID,
+      gameModeratorRoleId: process.env.DISCORD_GAME_MODERATOR_ROLE_ID,
+      memberRoleId: process.env.DISCORD_MEMBER_ROLE_ID,
+    };
     if (
-      !COMMAND_SETTINGS.adminRoleId ||
-      !COMMAND_SETTINGS.gameModeratorRoleId ||
-      !COMMAND_SETTINGS.memberRoleId
+      !commandSettings.adminRoleId ||
+      !commandSettings.gameModeratorRoleId ||
+      !commandSettings.memberRoleId
     ) {
       await interaction.reply({
         content:
@@ -186,7 +191,7 @@ export class CountCommand {
 
           const bucket = resolveRoleBucket(
             guildMember.roles.cache.map((role: Role) => role.id),
-            COMMAND_SETTINGS,
+            commandSettings,
           );
           if (!bucket) {
             continue;
