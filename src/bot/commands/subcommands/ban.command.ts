@@ -1,12 +1,18 @@
-import { SlashCommandPipe } from "@discord-nestjs/common";
-import { Command, DiscordClientProvider, EventParams, Handler, InteractionEvent, Param, ParamType } from "@discord-nestjs/core";
-import { ChatInputCommandInteraction, ClientEvents, TextChannel, GuildMemberRoleManager } from "discord.js";
-
-// Authorized roles that can run this command
-const AUTHORIZED_ROLES = [
-  '635885925003690006', // Admin
-  '824719678475599882', // Moderator
-];
+import { SlashCommandPipe } from '@discord-nestjs/common';
+import {
+  Command,
+  DiscordClientProvider,
+  EventParams,
+  Handler,
+  InteractionEvent,
+  Param,
+  ParamType,
+} from '@discord-nestjs/core';
+import {
+  ChatInputCommandInteraction,
+  ClientEvents,
+  PermissionFlagsBits,
+} from 'discord.js';
 
 // Channel ID where ban logs will be posted
 const BAN_LOG_CHANNEL_ID = '745429566453186631'; // Replace with your ban log channel ID
@@ -22,6 +28,8 @@ class BanCommandParams {
 @Command({
   name: 'janny',
   description: 'Bans a user and logs the action in the ban log channel.',
+  defaultMemberPermissions: PermissionFlagsBits.BanMembers,
+  dmPermission: false,
 })
 export class BanCommand {
   constructor(private readonly discordProvider: DiscordClientProvider) {}
@@ -35,21 +43,9 @@ export class BanCommand {
     const member = interaction.member;
     const guild = interaction.guild;
 
-    // Validate member exists
-    if (!member) {
+    if (!member || !guild) {
       await interaction.reply({
-        content: 'Unable to determine member. Please try again.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Permission check
-    const hasPermission = AUTHORIZED_ROLES.some(roleId => (member.roles as GuildMemberRoleManager).cache.has(roleId));
-
-    if (!hasPermission) {
-      await interaction.reply({
-        content: 'You do not have permission to run this command.',
+        content: 'This command can only be used by a server member.',
         ephemeral: true,
       });
       return;
@@ -75,7 +71,9 @@ export class BanCommand {
       }
 
       // Ban the user
-      const targetMember = await guild.members.fetch(userToBan.id).catch(() => null);
+      const targetMember = await guild.members
+        .fetch(userToBan.id)
+        .catch(() => null);
       if (targetMember) {
         await targetMember.ban({ reason: reason });
       } else {
@@ -93,14 +91,21 @@ export class BanCommand {
 
         try {
           const messages = await channel.messages.fetch({ limit: 100 });
-          const userMessages = messages.filter(msg => msg.author.id === userToBan.id && msg.createdTimestamp > oneDayAgo);
+          const userMessages = messages.filter(
+            (msg) =>
+              msg.author.id === userToBan.id &&
+              msg.createdTimestamp > oneDayAgo,
+          );
 
           if (userMessages.size > 0) {
             await channel.bulkDelete(userMessages);
             deletedMessageCount += userMessages.size;
           }
         } catch (error) {
-          console.error(`Error deleting messages in channel ${channel.id}:`, error);
+          console.error(
+            `Error deleting messages in channel ${channel.id}:`,
+            error,
+          );
         }
       }
 
@@ -108,7 +113,8 @@ export class BanCommand {
       let banLogMessageUrl = '';
       const banLogChannel = guild.channels.cache.get(BAN_LOG_CHANNEL_ID);
       if (banLogChannel && banLogChannel.isTextBased()) {
-        const logMessage = `**User Banned**\n` +
+        const logMessage =
+          `**User Banned**\n` +
           `**Banned User:** ${userToBan.username} (${userToBan.id})\n` +
           `**Banned By:** ${member.user.username}\n` +
           `**Reason:** ${reason}\n` +
@@ -126,7 +132,9 @@ export class BanCommand {
     } catch (error) {
       console.error('Error in ban command:', error);
       await interaction.editReply({
-        content: `An error occurred while banning the user: ${error.message}`,
+        content: `An error occurred while banning the user: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     }
   }

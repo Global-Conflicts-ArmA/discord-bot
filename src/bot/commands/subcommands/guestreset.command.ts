@@ -1,12 +1,15 @@
-import { SlashCommandPipe } from "@discord-nestjs/common";
-import { Command, EventParams, Handler, InteractionEvent } from "@discord-nestjs/core";
-import { ChatInputCommandInteraction, ClientEvents, GuildMemberRoleManager } from "discord.js";
-
-// Authorized roles that can run this command
-const AUTHORIZED_ROLES = [
-  '635885925003690006', // Admin
-  '824719678475599882', // Moderator
-];
+import { SlashCommandPipe } from '@discord-nestjs/common';
+import {
+  Command,
+  EventParams,
+  Handler,
+  InteractionEvent,
+} from '@discord-nestjs/core';
+import {
+  ChatInputCommandInteraction,
+  ClientEvents,
+  PermissionFlagsBits,
+} from 'discord.js';
 
 // Role IDs - Update these with your actual role IDs
 const GUEST_ROLE_ID = '1387180331085336616';
@@ -15,7 +18,10 @@ const MEMBER_ROLE_ID = '746545788930359358';
 
 @Command({
   name: 'guestreset',
-  description: 'Scans users with guest role and reassigns them based on member status.',
+  description:
+    'Scans users with guest role and reassigns them based on member status.',
+  defaultMemberPermissions: PermissionFlagsBits.ManageRoles,
+  dmPermission: false,
 })
 export class GuestResetCommand {
   @Handler()
@@ -24,24 +30,11 @@ export class GuestResetCommand {
     @EventParams() args: ClientEvents['interactionCreate'],
   ): Promise<void> {
     const interaction = args[0] as ChatInputCommandInteraction;
-    const member = interaction.member;
     const guild = interaction.guild;
 
-    // Validate member exists
-    if (!member) {
+    if (!guild) {
       await interaction.reply({
-        content: 'Unable to determine member. Please try again.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Permission check
-    const hasPermission = AUTHORIZED_ROLES.some(roleId => (member.roles as GuildMemberRoleManager).cache.has(roleId));
-
-    if (!hasPermission) {
-      await interaction.reply({
-        content: 'You do not have permission to run this command.',
+        content: 'This command can only be used in a server.',
         ephemeral: true,
       });
       return;
@@ -72,7 +65,9 @@ export class GuestResetCommand {
 
       // Fetch all members
       const allMembers = await guild.members.fetch();
-      const guestMembers = allMembers.filter(m => m.roles.cache.has(GUEST_ROLE_ID));
+      const guestMembers = allMembers.filter((m) =>
+        m.roles.cache.has(GUEST_ROLE_ID),
+      );
 
       let processedCount = 0;
       let skippedCount = 0;
@@ -81,7 +76,8 @@ export class GuestResetCommand {
       // Process each guest member
       for (const [, guestMember] of guestMembers) {
         try {
-          const isMember = memberRole && guestMember.roles.cache.has(MEMBER_ROLE_ID);
+          const isMember =
+            memberRole && guestMember.roles.cache.has(MEMBER_ROLE_ID);
 
           if (isMember) {
             // Just remove guest role if they have member role
@@ -94,7 +90,11 @@ export class GuestResetCommand {
 
           processedCount++;
         } catch (error) {
-          errors.push(`Failed to process ${guestMember.user.username}: ${error.message}`);
+          errors.push(
+            `Failed to process ${guestMember.user.username}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
           skippedCount++;
         }
       }
@@ -103,7 +103,9 @@ export class GuestResetCommand {
       let responseMessage = `**Guest Reset Complete**\n`;
       responseMessage += `**Processed:** ${processedCount} users\n`;
       responseMessage += `**Skipped:** ${skippedCount} users\n`;
-      responseMessage += `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>\n`;
+      responseMessage += `**Timestamp:** <t:${Math.floor(
+        Date.now() / 1000,
+      )}:F>\n`;
 
       if (errors.length > 0) {
         responseMessage += `\n**Errors:**\n${errors.join('\n')}`;
@@ -115,7 +117,9 @@ export class GuestResetCommand {
     } catch (error) {
       console.error('Error in guest reset command:', error);
       await interaction.editReply({
-        content: `An error occurred while processing guests: ${error.message}`,
+        content: `An error occurred while processing guests: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     }
   }
