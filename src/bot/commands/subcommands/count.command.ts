@@ -16,9 +16,9 @@ import {
 } from 'discord.js';
 
 const COMMAND_SETTINGS = {
-  adminRoleId: '1449981020144402583',
-  gameModeratorRoleId: '1475620468408189080',
-  memberRoleId: '1449994769005678603',
+  adminRoleId: process.env.DISCORD_ADMIN_ROLE_ID,
+  gameModeratorRoleId: process.env.DISCORD_GAME_MODERATOR_ROLE_ID,
+  memberRoleId: process.env.DISCORD_MEMBER_ROLE_ID,
 };
 
 interface PollAnswerResult {
@@ -107,6 +107,19 @@ export class CountCommand {
     if (!interaction.guild || !interaction.member) {
       await interaction.reply({
         content: 'This command can only be used in a server.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (
+      !COMMAND_SETTINGS.adminRoleId ||
+      !COMMAND_SETTINGS.gameModeratorRoleId ||
+      !COMMAND_SETTINGS.memberRoleId
+    ) {
+      await interaction.reply({
+        content:
+          'Role configuration is missing. Set DISCORD_ADMIN_ROLE_ID, DISCORD_GAME_MODERATOR_ROLE_ID, and DISCORD_MEMBER_ROLE_ID.',
         ephemeral: true,
       });
       return;
