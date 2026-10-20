@@ -11,10 +11,6 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 
-// Role IDs for role scanning
-const MEMBER_ROLE_ID = '746545788930359358';
-const NEW_GUY_ROLE_ID = '745753270055862332';
-
 @Command({
   name: 'rolescan',
   description:
@@ -39,6 +35,17 @@ export class RoleScanCommand {
       return;
     }
 
+    const memberRoleId = process.env.DISCORD_MEMBER_ROLE_ID;
+    const newGuyRoleId = process.env.DISCORD_NEW_GUY_ROLE_ID;
+    if (!memberRoleId || !newGuyRoleId) {
+      await interaction.reply({
+        content:
+          'Role configuration is missing. Set DISCORD_MEMBER_ROLE_ID and DISCORD_NEW_GUY_ROLE_ID.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     // Defer the reply as this operation may take time
     await interaction.deferReply();
 
@@ -53,13 +60,13 @@ export class RoleScanCommand {
       // Iterate through all members
       for (const [, guildMember] of members) {
         // Check if member has the Member role
-        if (guildMember.roles.cache.has(MEMBER_ROLE_ID)) {
+        if (guildMember.roles.cache.has(memberRoleId)) {
           scannedCount++;
 
           // Check if member also has the New Guy role
-          if (guildMember.roles.cache.has(NEW_GUY_ROLE_ID)) {
+          if (guildMember.roles.cache.has(newGuyRoleId)) {
             try {
-              await guildMember.roles.remove(NEW_GUY_ROLE_ID);
+              await guildMember.roles.remove(newGuyRoleId);
               removedCount++;
               removedUsers.push(`${guildMember.user.tag}`);
             } catch (error) {

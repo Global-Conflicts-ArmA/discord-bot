@@ -11,11 +11,6 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 
-// Role IDs - Update these with your actual role IDs
-const GUEST_ROLE_ID = '1387180331085336616';
-const NEW_GUY_ROLE_ID = '745753270055862332';
-const MEMBER_ROLE_ID = '746545788930359358';
-
 @Command({
   name: 'guestreset',
   description:
@@ -40,12 +35,24 @@ export class GuestResetCommand {
       return;
     }
 
+    const memberRoleId = process.env.DISCORD_MEMBER_ROLE_ID;
+    const newGuyRoleId = process.env.DISCORD_NEW_GUY_ROLE_ID;
+    const guestRoleId = process.env.DISCORD_GUEST_ROLE_ID;
+    if (!guestRoleId || !memberRoleId || !newGuyRoleId) {
+      await interaction.reply({
+        content:
+          'Role configuration is missing. Set DISCORD_GUEST_ROLE_ID, DISCORD_MEMBER_ROLE_ID, and DISCORD_NEW_GUY_ROLE_ID.',
+        ephemeral: true,
+      });
+      return;
+    }
+
     // Defer the reply as this operation may take time
     await interaction.deferReply();
 
     try {
       // Fetch all members with the guest role
-      const guestRole = await guild.roles.fetch(GUEST_ROLE_ID);
+      const guestRole = await guild.roles.fetch(guestRoleId);
       if (!guestRole) {
         await interaction.editReply({
           content: 'Guest role not found. Please check the role ID.',
@@ -53,8 +60,8 @@ export class GuestResetCommand {
         return;
       }
 
-      const memberRole = await guild.roles.fetch(MEMBER_ROLE_ID);
-      const newGuyRole = await guild.roles.fetch(NEW_GUY_ROLE_ID);
+      const memberRole = await guild.roles.fetch(memberRoleId);
+      const newGuyRole = await guild.roles.fetch(newGuyRoleId);
 
       if (!newGuyRole) {
         await interaction.editReply({
@@ -66,7 +73,7 @@ export class GuestResetCommand {
       // Fetch all members
       const allMembers = await guild.members.fetch();
       const guestMembers = allMembers.filter((m) =>
-        m.roles.cache.has(GUEST_ROLE_ID),
+        m.roles.cache.has(guestRoleId),
       );
 
       let processedCount = 0;
@@ -77,7 +84,7 @@ export class GuestResetCommand {
       for (const [, guestMember] of guestMembers) {
         try {
           const isMember =
-            memberRole && guestMember.roles.cache.has(MEMBER_ROLE_ID);
+            memberRole && guestMember.roles.cache.has(memberRoleId);
 
           if (isMember) {
             // Just remove guest role if they have member role
